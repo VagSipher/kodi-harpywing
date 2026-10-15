@@ -1,0 +1,8 @@
+dist/
+build/
+__pycache__/
+service.harpywing/bin/netbird-arm64
+service.harpywing/bin/netbird-amd64
+service.harpywing/LICENSES/
+repo/
+service.harpywing/THIRD_PARTY.md

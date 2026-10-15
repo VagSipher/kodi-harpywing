@@ -1,0 +1,5 @@
+# Official release checksums, from:
+# https://github.com/netbirdio/netbird/releases/download/v0.80.0/netbird_0.80.0_checksums.txt
+VERSION=0.80.0
+SHA256_ARM64=8cbd99fa068a7b0f3968b2d31dc341acc17dd1e97c3053e61ed5905dbdae7341
+SHA256_AMD64=47ffaba4fc3929f31795bd6c5232d6c29744d3169e2c93e6d9c84624f0ef6405

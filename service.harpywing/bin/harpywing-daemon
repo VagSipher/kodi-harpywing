@@ -1,0 +1,170 @@
+#!/bin/sh
+# Runs independently of Kodi; the identity must stay outside Samba shares.
+set -eu
+
+ADDON_DIR=$(cd "$(dirname "$0")/.." && pwd)
+DATA_DIR=${HARPYWING_DATA_DIR:-/storage/.kodi/userdata/addon_data/service.harpywing}
+while [ "$DATA_DIR" != / ] && [ "${DATA_DIR%/}" != "$DATA_DIR" ]; do
+  DATA_DIR=${DATA_DIR%/}
+done
+PRIVATE=${HARPYWING_PRIVATE:-/storage/.local/share/service.harpywing}
+HOSTS_PATH=${HARPYWING_HOSTS_PATH:-/etc/hosts}
+LEGACY_LINK=${HARPYWING_LEGACY_LINK:-/var/lib/netbird}
+SYS_NET=${HARPYWING_SYS_NET:-/sys/class/net}
+BOOT_ID=${HARPYWING_BOOT_ID:-/proc/sys/kernel/random/boot_id}
+STATE_DIR=$PRIVATE/state
+
+umask 077
+mkdir -p "$PRIVATE"
+chmod 700 "$PRIVATE"
+# DATA must be a real, separate directory. An alias to PRIVATE would migrate
+# the live identity into quarantine; a linked parent also makes unlink unsafe.
+migrate=1
+linked_parent=0
+parent=$(dirname "$DATA_DIR")
+while [ "$parent" != / ] && [ "$parent" != . ]; do
+  [ ! -L "$parent" ] || linked_parent=1
+  parent=$(dirname "$parent")
+done
+data_real=$(readlink -f "$DATA_DIR") || data_real=
+private_real=$(readlink -f "$PRIVATE")
+if [ "$linked_parent" -eq 1 ] || [ -L "$DATA_DIR" ] || [ ! -d "$DATA_DIR" ] || [ -z "$data_real" ]; then
+  migrate=0
+fi
+case "$data_real/" in "$private_real/"*) migrate=0 ;; esac
+case "$private_real/" in "$data_real/"*) migrate=0 ;; esac
+if [ "$migrate" -eq 0 ]; then
+  if [ "$linked_parent" -eq 0 ] && [ -L "$DATA_DIR" ]; then
+    data_parent=$(readlink -f "$(dirname "$DATA_DIR")")
+    data_path=$data_parent/$(basename "$DATA_DIR")
+    safe_link=1
+    case "$data_path/" in "$private_real/"*) safe_link=0 ;; esac
+    case "$private_real/" in "$data_path/"*) safe_link=0 ;; esac
+    [ "$safe_link" -eq 0 ] || unlink "$DATA_DIR"
+  fi
+  echo "Harpy Wing: migration skipped unsafe or missing DATA directory: $DATA_DIR" >&2
+fi
+# systemd has stopped the previous daemon before starting this wrapper.
+# The wrapper never touches operation.lock: Kodi owns its private lock inode.
+if [ "$migrate" -eq 1 ]; then
+  for name in state hosts options.json version previous-version; do
+    old=$DATA_DIR/$name
+    new=$PRIVATE/$name
+    if [ -e "$old" ] || [ -L "$old" ]; then
+      if [ -L "$old" ]; then
+        unlink "$old"
+        echo "Harpy Wing: migration removed old $name symlink" >&2
+        continue
+      fi
+      if [ "$name" = state ] && [ -d "$old" ]; then
+        # find defaults to not following symlinks, including directory links.
+        find "$old" -type l -exec sh -c '
+          for link do
+            unlink "$link" || exit 1
+            echo "Harpy Wing: migration removed old state symlink: $link" >&2
+          done
+        ' sh {} +
+      fi
+      if [ -e "$new" ] || [ -L "$new" ]; then
+        mkdir -p "$PRIVATE/quarantine"
+        chmod 700 "$PRIVATE/quarantine"
+        target=$PRIVATE/quarantine/$name-$(date -u +%Y%m%dT%H%M%SZ)
+        new=$target
+        count=0
+        while [ -e "$new" ] || [ -L "$new" ]; do
+          count=$((count + 1))
+          new=$target-$count
+        done
+        echo "Harpy Wing: keeping private $name; quarantining old copy in $new" >&2
+      fi
+      mv "$old" "$new"
+    fi
+  done
+  if [ -L "$LEGACY_LINK" ] && [ "$(readlink "$LEGACY_LINK")" = "$DATA_DIR/state" ]; then
+    unlink "$LEGACY_LINK"
+  fi
+fi
+mkdir -p "$STATE_DIR"
+chmod 700 "$STATE_DIR"
+
+# A hosts failure must never keep the tunnel down.
+sh "$ADDON_DIR/bin/harpywing-hosts" "$HOSTS_PATH" "$PRIVATE/hosts" \
+  || echo "Harpy Wing: hosts entries not applied at boot" >&2
+export NB_STATE_DIR="$STATE_DIR"
+export XDG_CONFIG_HOME="$STATE_DIR/user-config"
+"$ADDON_DIR/bin/netbird" service run --log-file console --log-level info &
+netbird_pid=$!
+
+# A killed netbird leaves its kernel WireGuard interface up, and systemd
+# restarts us only 10 s later (never, if the add-on is uninstalled meanwhile).
+# Delete it, but only the very interface Kodi recorded as ours.
+remove_leftover_interface() {
+  record=$(cat "$PRIVATE/interface" 2>/dev/null) || return 0
+  field() { printf '%s' "$record" | sed -n "s/.*\"$1\": *\"\([^\"]*\)\".*/\1/p"; }
+  name=$(field name); ifindex=$(field ifindex); boot=$(field boot)
+  case "$name" in ''|*[!A-Za-z0-9_.-]*|[.-]*) return 0 ;; esac
+  [ "${#name}" -le 15 ] && [ -n "$ifindex" ] && [ -n "$boot" ] || return 0
+  [ "$(cat "$BOOT_ID" 2>/dev/null)" = "$boot" ] || return 0
+  [ "$(cat "$SYS_NET/$name/ifindex" 2>/dev/null)" = "$ifindex" ] || return 0
+  grep -qx 'DEVTYPE=wireguard' "$SYS_NET/$name/uevent" 2>/dev/null || return 0
+  if ip link delete "$name"; then
+    echo "Harpy Wing: removed interface left by netbird: $name" >&2
+  fi
+}
+
+wrapper_pid=$$
+watch_addon() {
+  missing=0
+  sleeper=
+  trap '[ -z "$sleeper" ] || kill "$sleeper" 2>/dev/null || true; exit 0' TERM INT
+  while :; do
+    sleep 60 &
+    sleeper=$!
+    wait "$sleeper" || return 0
+    sleeper=
+    if [ -e "$ADDON_DIR/bin/netbird" ]; then
+      missing=0
+    else
+      missing=$((missing + 1))
+    fi
+    [ "$missing" -ge 2 ] || continue
+    # Only the parent can wait for netbird before cleaning up.
+    kill -USR1 "$wrapper_pid"
+    # Return only after notifying the parent; no process-exit polling race.
+    return 0
+  done
+}
+uninstalled=0
+trap 'uninstalled=1; kill -TERM "$netbird_pid" 2>/dev/null || true' USR1
+watch_addon &
+watcher_pid=$!
+# A trapped signal interrupts wait: wait again to reap the daemon after TERM.
+stop_requested=0
+trap 'stop_requested=1; kill -TERM "$netbird_pid" 2>/dev/null || true' TERM INT
+result=0
+wait "$netbird_pid" || result=$?
+if [ "$stop_requested" -eq 1 ] || [ "$uninstalled" -eq 1 ]; then
+  result=0
+  wait "$netbird_pid" || result=$?
+fi
+kill -TERM "$watcher_pid" 2>/dev/null || true
+wait "$watcher_pid" 2>/dev/null || true
+if [ "$stop_requested" -eq 0 ] && [ "$uninstalled" -eq 0 ]; then
+  remove_leftover_interface || true
+fi
+if [ "$uninstalled" -eq 1 ] && [ "$stop_requested" -eq 0 ]; then
+  # The add-on scripts are already gone; remove only our own hosts block.
+  path=$(readlink -f "$HOSTS_PATH")
+  temp=$(mktemp "$path.harpywing-XXXXXX")
+  trap 'rm -f "$temp"' EXIT
+  awk '
+    { marker=$0; sub(/^[[:space:]]+/, "", marker); sub(/[[:space:]]+$/, "", marker) }
+    marker == "# BEGIN service.harpywing" { inside=1; next }
+    marker == "# END service.harpywing" { inside=0; next }
+    !inside { print }
+  ' "$path" > "$temp"
+  chmod 644 "$temp"
+  mv "$temp" "$path"
+  systemctl disable service.harpywing.service || true
+fi
+exit "$result"

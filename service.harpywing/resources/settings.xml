@@ -1,0 +1,107 @@
+<?xml version='1.0' encoding='utf-8'?>
+<settings version="1">
+  <section id="service.harpywing">
+    <category id="connection" label="32000">
+      <group id="1">
+        <setting id="enabled" type="boolean" label="32001" help="32101">
+          <level>0</level>
+          <default>true</default>
+          <control type="toggle" />
+        </setting>
+        <setting id="management_url" type="string" label="32002" help="32102">
+          <level>0</level>
+          <default>https://api.netbird.io</default>
+          <constraints>
+            <allowempty>true</allowempty>
+          </constraints>
+          <control type="edit" format="string">
+            <heading>32002</heading>
+          </control>
+        </setting>
+        <setting id="login_method" type="integer" label="32005" help="32105">
+          <level>0</level>
+          <default>0</default>
+          <constraints>
+            <options>
+              <option label="32006">0</option>
+              <option label="32007">1</option>
+            </options>
+          </constraints>
+          <control type="spinner" format="string" />
+        </setting>
+        <setting id="device_name" type="string" label="32004" help="32104">
+          <level>0</level>
+          <default />
+          <constraints>
+            <allowempty>true</allowempty>
+          </constraints>
+          <control type="edit" format="string">
+            <heading>32004</heading>
+          </control>
+        </setting>
+        <setting id="connection_validated" type="string" label="32020">
+          <level>4</level>
+          <default />
+          <visible>false</visible>
+          <control type="edit" format="string" />
+        </setting>
+      </group>
+    </category>
+    <category id="access" label="32010">
+      <group id="1">
+        <setting id="receive_routes" type="boolean" label="32011" help="32111">
+          <level>0</level>
+          <default>false</default>
+          <control type="toggle" />
+        </setting>
+        <setting id="allow_inbound" type="boolean" label="32012" help="32112">
+          <level>0</level>
+          <default>false</default>
+          <control type="toggle" />
+        </setting>
+        <setting id="hosts" type="string" label="32013" help="32113">
+          <level>0</level>
+          <default />
+          <constraints>
+            <allowempty>true</allowempty>
+          </constraints>
+          <control type="edit" format="string">
+            <heading>32013</heading>
+          </control>
+        </setting>
+      </group>
+    </category>
+    <category id="tools" label="32019">
+      <group id="1">
+        <setting id="wizard" type="action" label="32030" help="32130">
+          <level>0</level>
+          <data>RunScript(special://home/addons/service.harpywing/action.py,wizard)</data>
+          <control type="button" format="action">
+            <close>true</close>
+          </control>
+        </setting>
+        <setting id="status" type="action" label="32020" help="32120">
+          <level>0</level>
+          <data>RunScript(special://home/addons/service.harpywing/status.py)</data>
+          <control type="button" format="action">
+            <close>true</close>
+          </control>
+        </setting>
+        <setting id="journal" type="action" label="32081" help="32181">
+          <level>0</level>
+          <data>RunScript(special://home/addons/service.harpywing/journal.py)</data>
+          <control type="button" format="action">
+            <close>true</close>
+          </control>
+        </setting>
+        <setting id="disconnect" type="action" label="32031" help="32131">
+          <level>0</level>
+          <data>RunScript(special://home/addons/service.harpywing/action.py,disconnect)</data>
+          <control type="button" format="action">
+            <close>true</close>
+          </control>
+        </setting>
+      </group>
+    </category>
+  </section>
+</settings>

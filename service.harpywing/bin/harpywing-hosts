@@ -1,0 +1,41 @@
+#!/bin/sh
+# GPL-3.0-or-later. Called by the daemon; args: hosts file, validated mappings file.
+set -eu
+# Same marker replacement as core.apply_hosts(), without Python/Kodi at boot.
+HOSTS_PATH=$(readlink -f "$1")
+HOSTS_TEMP=$(mktemp "$HOSTS_PATH.harpywing-XXXXXX")
+trap 'rm -f "$HOSTS_TEMP"' EXIT HUP INT TERM
+awk '
+  { marker=$0; sub(/^[[:space:]]+/, "", marker); sub(/[[:space:]]+$/, "", marker) }
+  marker == "# BEGIN service.harpywing" { inside=1; next }
+  marker == "# END service.harpywing" { inside=0; next }
+  !inside { lines[++n]=$0 }
+  END { while (n > 0 && lines[n] ~ /^[[:space:]]*$/) n--; for (i=1;i<=n;i++) print lines[i] }
+' "$HOSTS_PATH" > "$HOSTS_TEMP"
+if [ -s "$2" ]; then
+  printf '\n# BEGIN service.harpywing\n' >> "$HOSTS_TEMP"
+  # Revalidate persisted data: an older layout may have been LAN writable.
+  LC_ALL=C awk '
+    function valid_ip(ip, a, n, i) {
+      n=split(ip,a,".")
+      if (n != 4) return 0
+      for (i=1;i<=4;i++)
+        if (a[i] !~ /^[0-9]+$/ || length(a[i]) > 3 ||
+            (length(a[i]) > 1 && substr(a[i],1,1) == "0") || a[i]+0 > 255) return 0
+      return a[1]+0 == 100 && a[2]+0 >= 64 && a[2]+0 <= 127
+    }
+    function valid_name(name, labels, n, i) {
+      if (length(name) > 253 || name !~ /^[a-z0-9.-]+$/) return 0
+      n=split(name,labels,".")
+      for (i=1;i<=n;i++)
+        if (length(labels[i]) < 1 || length(labels[i]) > 63 ||
+            labels[i] !~ /^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/) return 0
+      return 1
+    }
+    NF == 2 && valid_ip($1) && valid_name($2) { print $1, $2 }
+  ' "$2" >> "$HOSTS_TEMP"
+  printf '# END service.harpywing\n' >> "$HOSTS_TEMP"
+fi
+chmod 644 "$HOSTS_TEMP"
+mv "$HOSTS_TEMP" "$HOSTS_PATH"
+

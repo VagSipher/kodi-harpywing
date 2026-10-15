@@ -1,0 +1,240 @@
+msgid ""
+msgstr ""
+"Content-Type: text/plain; charset=UTF-8\n"
+"Language: en_gb\n"
+
+msgctxt "#32000"
+msgid "Connection"
+msgstr "Connection"
+
+msgctxt "#32001"
+msgid "Connect this box"
+msgstr "Connect this box"
+
+msgctxt "#32002"
+msgid "Server address"
+msgstr "Server address"
+
+msgctxt "#32003"
+msgid "Setup key"
+msgstr "Setup key"
+
+msgctxt "#32004"
+msgid "Device name"
+msgstr "Device name"
+
+msgctxt "#32005"
+msgid "Login method"
+msgstr "Login method"
+
+msgctxt "#32006"
+msgid "Setup key"
+msgstr "Setup key"
+
+msgctxt "#32007"
+msgid "Account (QR code)"
+msgstr "Account (QR code)"
+
+msgctxt "#32010"
+msgid "Access"
+msgstr "Access"
+
+msgctxt "#32011"
+msgid "Receive network routes"
+msgstr "Receive network routes"
+
+msgctxt "#32012"
+msgid "Accept inbound connections"
+msgstr "Accept inbound connections"
+
+msgctxt "#32013"
+msgid "Names to reach"
+msgstr "Names to reach"
+
+msgctxt "#32019"
+msgid "Tools"
+msgstr "Tools"
+
+msgctxt "#32020"
+msgid "Connection status"
+msgstr "Connection status"
+
+msgctxt "#32021"
+msgid "State: %s"
+msgstr "State: %s"
+
+msgctxt "#32022"
+msgid "NetBird address: %s"
+msgstr "NetBird address: %s"
+
+msgctxt "#32023"
+msgid "Direct connection"
+msgstr "Direct connection"
+
+msgctxt "#32024"
+msgid "Connection through a relay"
+msgstr "Connection through a relay"
+
+msgctxt "#32025"
+msgid "No connected peer"
+msgstr "No connected peer"
+
+msgctxt "#32030"
+msgid "Connection wizard"
+msgstr "Connection wizard"
+
+msgctxt "#32031"
+msgid "Disconnect and forget this device"
+msgstr "Disconnect and forget this device"
+
+msgctxt "#32050"
+msgid "Connected"
+msgstr "Connected"
+
+msgctxt "#32051"
+msgid "A setup key is required. Retry or cancel setup?"
+msgstr "A setup key is required. Retry or cancel setup?"
+
+msgctxt "#32052"
+msgid "Connection failed: %s"
+msgstr "Connection failed: %s"
+
+msgctxt "#32053"
+msgid "Device enrolled; setup key erased"
+msgstr "Device enrolled; setup key erased"
+
+msgctxt "#32054"
+msgid "Unsupported architecture (%s). armv7 is not supported."
+msgstr "Unsupported architecture (%s). armv7 is not supported."
+
+msgctxt "#32055"
+msgid "Invalid names list. Use name=address;name=address with unique names and NetBird IPv4 addresses (100.64.0.0/10)."
+msgstr "Invalid names list. Use name=address;name=address with unique names and NetBird IPv4 addresses (100.64.0.0/10)."
+
+msgctxt "#32056"
+msgid "NetBird cannot start on this box: %s"
+msgstr "NetBird cannot start on this box: %s"
+
+msgctxt "#32060"
+msgid "Invalid server address. Enter an HTTPS URL without credentials, query or path."
+msgstr "Invalid server address. Enter an HTTPS URL without credentials, query or path."
+
+msgctxt "#32070"
+msgid "Cancel"
+msgstr "Cancel"
+
+msgctxt "#32071"
+msgid "Retry"
+msgstr "Retry"
+
+msgctxt "#32072"
+msgid "Connecting…"
+msgstr "Connecting…"
+
+msgctxt "#32073"
+msgid "Setup cancelled"
+msgstr "Setup cancelled"
+
+msgctxt "#32074"
+msgid "Login timed out (5 minutes). Run the connection wizard to try again."
+msgstr "Login timed out (5 minutes). Run the connection wizard to try again."
+
+msgctxt "#32075"
+msgid "For a TV box to stay connected, open the NetBird console, select this device and disable its login expiration."
+msgstr "For a TV box to stay connected, open the NetBird console, select this device and disable its login expiration."
+
+msgctxt "#32076"
+msgid "Scan the QR code with your phone, sign in and approve this device. Enter the code below if requested."
+msgstr "Scan the QR code with your phone, sign in and approve this device. Enter the code below if requested."
+
+msgctxt "#32077"
+msgid "Applying changed options: reconnecting without a setup key."
+msgstr "Applying changed options: reconnecting without a setup key."
+
+msgctxt "#32078"
+msgid "Another connection operation is running. Please try again when it finishes."
+msgstr "Another connection operation is running. Please try again when it finishes."
+
+msgctxt "#32079"
+msgid "Disconnect and erase the local identity? A new key or account login will be needed. This does not revoke the device on the server; an administrator can remove it in the NetBird console."
+msgstr "Disconnect and erase the local identity? A new key or account login will be needed. This does not revoke the device on the server; an administrator can remove it in the NetBird console."
+
+msgctxt "#32080"
+msgid "Disconnected; local identity forgotten"
+msgstr "Disconnected; local identity forgotten"
+
+msgctxt "#32081"
+msgid "Harpy Wing journal"
+msgstr "Harpy Wing journal"
+
+msgctxt "#32082"
+msgid "Save journal"
+msgstr "Save journal"
+
+msgctxt "#32083"
+msgid "Journal saved to /storage/harpywing-journal.txt"
+msgstr "Journal saved to /storage/harpywing-journal.txt"
+
+msgctxt "#32084"
+msgid "Not connected"
+msgstr "Not connected"
+
+msgctxt "#32085"
+msgid "Daemon: %s"
+msgstr "Daemon: %s"
+
+msgctxt "#32101"
+msgid "Off: stops NetBird and removes startup and names. The local identity is kept. Disabling the Kodi add-on alone does not stop the tunnel."
+msgstr "Off: stops NetBird and removes startup and names. The local identity is kept. Disabling the Kodi add-on alone does not stop the tunnel."
+
+msgctxt "#32102"
+msgid "NetBird Cloud: https://api.netbird.io. For a self-hosted server, enter its HTTPS management address."
+msgstr "NetBird Cloud: https://api.netbird.io. For a self-hosted server, enter its HTTPS management address."
+
+msgctxt "#32104"
+msgid "Name shown in NetBird. Empty: the box name."
+msgstr "Name shown in NetBird. Empty: the box name."
+
+msgctxt "#32105"
+msgid "Choose a setup key or sign in with your account by scanning a QR code."
+msgstr "Choose a setup key or sign in with your account by scanning a QR code."
+
+msgctxt "#32111"
+msgid "Allows access to networks and Internet exits advertised by peers. Off still allows peers permitted by the server policy. Changes reconnect this box."
+msgstr "Allows access to networks and Internet exits advertised by peers. Off still allows peers permitted by the server policy. Changes reconnect this box."
+
+msgctxt "#32112"
+msgid "Removes NetBird's inbound block: every service listening on this box (Kodi web interface, SSH, file sharing...) becomes reachable by peers the server allows. Keep this off unless needed."
+msgstr "Removes NetBird's inbound block: every service listening on this box (Kodi web interface, SSH, file sharing...) becomes reachable by peers the server allows. Keep this off unless needed."
+
+msgctxt "#32113"
+msgid "Optional: name=NetBird IPv4;name=NetBird IPv4. Names are restored at boot. NetBird DNS stays disabled."
+msgstr "Optional: name=NetBird IPv4;name=NetBird IPv4. Names are restored at boot. NetBird DNS stays disabled."
+
+msgctxt "#32120"
+msgid "Shows connection state, address and direct or relayed link."
+msgstr "Shows connection state, address and direct or relayed link."
+
+msgctxt "#32130"
+msgid "Run setup with the remote control. Kore or Yatse can send text."
+msgstr "Run setup with the remote control. Kore or Yatse can send text."
+
+msgctxt "#32131"
+msgid "Disconnects and erases this box’s local identity, after confirmation."
+msgstr "Disconnects and erases this box’s local identity, after confirmation."
+
+msgctxt "#32181"
+msgid "View the systemd and Kodi journal on TV, with secrets masked, or save it locally."
+msgstr "View the systemd and Kodi journal on TV, with secrets masked, or save it locally."
+
+msgctxt "#32086"
+msgid "File sharing (Samba) is open without a password: anyone on this network can read and change this box's files. Set a Samba password in CoreELEC/LibreELEC settings > Services."
+msgstr "File sharing (Samba) is open without a password: anyone on this network can read and change this box's files. Set a Samba password in CoreELEC/LibreELEC settings > Services."
+
+msgctxt "#32087"
+msgid "Disconnecting…"
+msgstr "Disconnecting…"
+
+msgctxt "#32088"
+msgid "Invalid server address: the tunnel is stopped until it is fixed. Enter an HTTPS URL without credentials, query or path."
+msgstr "Invalid server address: the tunnel is stopped until it is fixed. Enter an HTTPS URL without credentials, query or path."
