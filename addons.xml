@@ -1,0 +1,33 @@
+<?xml version='1.0' encoding='utf-8'?>
+<addons>
+    <addon id="repository.harpywing" name="Harpy Wing Repository" version="0.2.0" provider-name="Harpy Wing contributors">
+        <extension point="xbmc.addon.repository" name="Harpy Wing Repository">
+            <dir>
+                <info compressed="false">https://vagsipher.github.io/kodi-harpywing/addons.xml</info>
+                <checksum>https://vagsipher.github.io/kodi-harpywing/addons.xml.md5</checksum>
+                <datadir zip="true">https://vagsipher.github.io/kodi-harpywing/</datadir>
+            </dir>
+        </extension>
+        <extension point="xbmc.addon.metadata">
+            <summary lang="en_GB">Unofficial NetBird client for Kodi: Harpy Wing repository</summary>
+            <description lang="en_GB">Unofficial NetBird client for Kodi: Harpy Wing repository</description>
+            <platform>all</platform>
+            <license>MIT</license>
+        </extension>
+    </addon>
+    <addon id="service.harpywing" name="Harpy Wing" version="0.3.9+nb0.80.0" provider-name="Harpy Wing contributors">
+        <requires>
+            <import addon="xbmc.python" version="3.0.0" />
+        </requires>
+        <extension point="xbmc.service" library="service.py" />
+        <extension point="xbmc.addon.metadata">
+            <summary lang="en_GB">Unofficial NetBird client for Kodi</summary>
+            <description lang="en_GB">Connects CoreELEC or LibreELEC to NetBird Cloud or your NetBird server. Setup key or account QR wizard, status and journal on TV. arm64 and x86_64; armv7 is not supported.</description>
+            <platform>linux</platform>
+            <license>GPL-3.0-or-later (add-on), BSD-3-Clause (NetBird client)</license>
+            <assets>
+                <icon>icon.png</icon>
+            </assets>
+        </extension>
+    </addon>
+</addons>
