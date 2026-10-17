@@ -108,8 +108,8 @@ msgid "Unsupported architecture (%s). armv7 is not supported."
 msgstr "Unsupported architecture (%s). armv7 is not supported."
 
 msgctxt "#32055"
-msgid "Invalid names list. Use name=address;name=address with unique names and NetBird IPv4 addresses (100.64.0.0/10)."
-msgstr "Invalid names list. Use name=address;name=address with unique names and NetBird IPv4 addresses (100.64.0.0/10)."
+msgid "Invalid names list. Use name or name=address, separated by semicolons, with unique names and NetBird IPv4 addresses (100.64.0.0/10)."
+msgstr "Invalid names list. Use name or name=address, separated by semicolons, with unique names and NetBird IPv4 addresses (100.64.0.0/10)."
 
 msgctxt "#32056"
 msgid "NetBird cannot start on this box: %s"
@@ -208,8 +208,8 @@ msgid "Removes NetBird's inbound block: every service listening on this box (Kod
 msgstr "Removes NetBird's inbound block: every service listening on this box (Kodi web interface, SSH, file sharing...) becomes reachable by peers the server allows. Keep this off unless needed."
 
 msgctxt "#32113"
-msgid "Optional: name=NetBird IPv4;name=NetBird IPv4. Names are restored at boot. NetBird DNS stays disabled."
-msgstr "Optional: name=NetBird IPv4;name=NetBird IPv4. Names are restored at boot. NetBird DNS stays disabled."
+msgid "Optional: name;name=NetBird IPv4. Names without an address use NetBird local DNS, refreshed every minute. Last known addresses are kept on failure and restored at boot. System DNS stays unchanged."
+msgstr "Optional: name;name=NetBird IPv4. Names without an address use NetBird local DNS, refreshed every minute. Last known addresses are kept on failure and restored at boot. System DNS stays unchanged."
 
 msgctxt "#32120"
 msgid "Shows connection state, address and direct or relayed link."
@@ -238,3 +238,7 @@ msgstr "Disconnecting…"
 msgctxt "#32088"
 msgid "Invalid server address: the tunnel is stopped until it is fixed. Enter an HTTPS URL without credentials, query or path."
 msgstr "Invalid server address: the tunnel is stopped until it is fixed. Enter an HTTPS URL without credentials, query or path."
+
+msgctxt "#32089"
+msgid "Name %s already exists outside Harpy Wing’s hosts block and may override it. Check /storage/.config/hosts.conf on CoreELEC. Existing entries are kept."
+msgstr "Name %s already exists outside Harpy Wing’s hosts block and may override it. Check /storage/.config/hosts.conf on CoreELEC. Existing entries are kept."

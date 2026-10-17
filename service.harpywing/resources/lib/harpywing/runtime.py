@@ -6,9 +6,11 @@ import json
 import os
 import re
 import shutil
+import socket
 import stat
 import subprocess
 import tempfile
+import time
 
 import xbmc
 import xbmcaddon
@@ -28,6 +30,8 @@ LEGACY_STATE_LINK = "/var/lib/netbird"
 PRIVATE_FILES = ("state", "hosts", "options.json", "version", "previous-version")
 SYS_NET = "/sys/class/net"
 BOOT_ID = "/proc/sys/kernel/random/boot_id"
+_name_states = {}
+_hosts_notices = set()
 
 
 def settings():
@@ -222,17 +226,122 @@ def read_file(name):
     try:
         with open(os.path.join(PRIVATE, name), encoding="utf-8") as stream:
             return stream.read()
-    except OSError:
+    except OSError as exc:
+        if name == "hosts" and not isinstance(exc, FileNotFoundError):
+            log("ignoring unreadable hosts cache", xbmc.LOGERROR)
+        return ""
+    except UnicodeError:
+        log("ignoring non-UTF-8 private file: " + name, xbmc.LOGERROR)
         return ""
 
 
+class OtherServer(ValueError):
+    """NetBird answers for another management server: its names are not ours."""
+
+
+def _dns_server(timeout=2, management_url=None):
+    raw = status_json(timeout=timeout)
+    current = core.parse_status(raw)
+    address = current["ip"].split("/", 1)[0]
+    if current["daemon"] != "Connected" or not address or core.validate_mapping("peer", address):
+        raise ValueError("NetBird is not connected or has no overlay IPv4")
+    wanted = core.normalize_server(management_url if management_url is not None else options()["management_url"])
+    reported = (json.loads(raw).get("management") or {}).get("url")
+    if not wanted or core.normalize_server(reported) != wanted:
+        raise OtherServer("NetBird is connected to another server")
+    return address, 53
+
+
+def _cached_names(management_url):
+    lines = read_file("hosts").splitlines()
+    if not lines or not management_url or lines[0] != "# server " + management_url:
+        return {}
+    previous = {}
+    for line in lines[1:]:
+        fields = line.split()
+        if (len(fields) != 2 or core.validate_mapping(fields[1], fields[0])
+                or fields[1].lower() in previous):
+            log("ignoring invalid hosts cache", xbmc.LOGERROR)
+            return {}
+        previous[fields[1].lower()] = fields[0]
+    return previous
+
+
+def _dns_remaining(deadline):
+    remaining = deadline - time.monotonic()
+    if remaining <= 0:
+        raise TimeoutError("DNS resolution budget exhausted")
+    return remaining
+
+
+def resolve_names(mappings, management_url=None):
+    deadline = time.monotonic() + 3
+    origin = core.normalize_server(management_url if management_url is not None else options()["management_url"])
+    has_dns = any(ip is None for host, ip in mappings)
+    previous = _cached_names(origin) if has_dns else {}
+    server, failure = None, ""
+    if has_dns:
+        try:
+            server = _dns_server(timeout=_dns_remaining(deadline), management_url=origin)
+        except (ValueError, TypeError, AttributeError, OSError) as exc:
+            failure = str(exc)
+            if isinstance(exc, OtherServer):
+                # The tunnel leads to another server: cached addresses may now
+                # belong to other peers. Keep only forced addresses (3rd review).
+                previous = {}
+    result = []
+    for host, ip in mappings:
+        if ip is None:
+            try:
+                remaining = _dns_remaining(deadline)
+                if server is None:
+                    raise ValueError(failure)
+                identifier = int.from_bytes(os.urandom(2), "big")
+                with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+                    sock.settimeout(remaining)
+                    sock.connect(server)
+                    sock.send(core.dns_query(host, identifier))
+                    sock.settimeout(_dns_remaining(deadline))
+                    packet, ancillary, flags, source = sock.recvmsg(core.DNS_MAX_PACKET)
+                    if flags & socket.MSG_TRUNC:
+                        raise ValueError("DNS packet too large")
+                    ip = core.dns_address(packet, host, identifier)
+                state = "resolved to " + ip
+            except (OSError, ValueError) as exc:
+                ip = previous.get(host)
+                state = "DNS failed (%s); %s" % (exc, "keeping " + ip if ip else "no saved address")
+            if _name_states.get(host) != state:
+                log("%s: %s" % (host, state))
+                _name_states[host] = state
+        if ip is not None:
+            if core.validate_mapping(host, ip):
+                raise ValueError("invalid hosts mapping")
+            result.append((host, ip))
+    return result
+
+
 def write_hosts(mappings=()):
-    # Persist before touching /etc/hosts: the daemon restores it before Kodi.
-    save_file("hosts", "".join("%s %s\n" % (ip, host) for host, ip in mappings))
+    mappings = list(mappings)
+    origin = core.normalize_server(options()["management_url"])
+    resolved = resolve_names(mappings, origin)
     path = os.path.realpath(HOSTS)
     with open(path, encoding="utf-8", errors="replace") as stream:
         current = stream.read()
-    wanted = core.apply_hosts(current, mappings=mappings)
+    outside = {host for host, ip in core.hosts_mappings(core.apply_hosts(current))}
+    setting = settings().getSetting("hosts")
+    for host, ip in mappings:
+        notice = (setting, host)
+        if host in outside and notice not in _hosts_notices:
+            _hosts_notices.add(notice)
+            try:
+                notify(32089, host)
+            except Exception as exc:
+                log(text(32089, host) + " (notification failed: %s)" % exc, xbmc.LOGERROR)
+    # Persist before touching /etc/hosts: the daemon restores it before Kodi.
+    saved = "# server %s\n" % origin + "".join("%s %s\n" % (ip, host) for host, ip in resolved)
+    if not resolved or read_file("hosts") != saved:
+        save_file("hosts", saved)
+    wanted = core.apply_hosts(current, mappings=resolved)
     if current != wanted:
         fd, temp = tempfile.mkstemp(prefix=".harpywing-hosts-", dir=os.path.dirname(path))
         try:

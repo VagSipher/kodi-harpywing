@@ -5,9 +5,11 @@ import os
 from pathlib import Path
 import runpy
 import shutil
+import struct
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 import xml.etree.ElementTree as ET
 from unittest.mock import Mock, mock_open, patch
@@ -18,6 +20,72 @@ from harpywing import core
 from harpywing.logformat import journal_contents
 
 ROOT = fixtures.ROOT
+
+
+class DNSHardeningTest(unittest.TestCase):
+    setUp = fixtures.RuntimeTest.setUp
+
+    def oversized_reply(self, query):
+        record = b'\xc0\x0c' + struct.pack('!HHIH', 1, 1, 0, 4) + b'\x64\x50\0\2'
+        return query[:2] + struct.pack('!5H', 0x8180, 1, 4090, 0, 0) + query[12:] + record * 4090
+
+    def test_large_shared_pointer_packet_is_rejected_immediately(self):
+        packet = self.oversized_reply(core.dns_query('media.example.net', 123))
+        self.assertGreater(len(packet), 64000)
+        started = time.perf_counter()
+        with self.assertRaisesRegex(ValueError, 'DNS packet too large'):
+            core.dns_address(packet, 'media.example.net', 123)
+        self.assertLess(time.perf_counter() - started, 0.1)
+
+    def test_hostile_udp_replies_never_replace_saved_mapping(self):
+        rt = self.rt
+        hosts = fixtures.RuntimeTest.hosts_file(self)
+        saved = fixtures.RuntimeTest.cache_text(self, '100.80.0.1 media.example.net\n')
+        rt.save_file('hosts', saved)
+        def header(query, flags=0x8180, questions=1):
+            return query[:2] + struct.pack('!5H', flags, questions, 1, 0, 0)
+        def answer(query, owner):
+            return header(query) + query[12:] + owner + struct.pack('!HHIH', 1, 1, 0, 4) + b'\x64\x50\0\2'
+        replies = {
+            'short header': lambda q: q[:5],
+            'truncated answer': lambda q: fixtures.dns_reply(q)[:-1],
+            'wrong id': lambda q: bytes([q[0] ^ 1]) + fixtures.dns_reply(q)[1:],
+            'query flag': lambda q: fixtures.dns_reply(q, flags=0x0180),
+            'wrong opcode': lambda q: fixtures.dns_reply(q, flags=0x8980),
+            'truncated flag': lambda q: fixtures.dns_reply(q, flags=0x8380),
+            'question count': lambda q: header(q, questions=0) + q[12:],
+            'wrong question': lambda q: header(q) + b'\x05x' + q[14:],
+            'wrong qtype': lambda q: header(q) + q[12:-4] + b'\0\x1c\0\1',
+            'wrong qclass': lambda q: header(q) + q[12:-4] + b'\0\1\0\3',
+            'literal dots in question label': lambda q: header(q) + b'\x11media.example.net\0\0\1\0\1',
+            'question pointer loop': lambda q: header(q) + b'\xc0\x0c\0\1\0\1',
+            'answer pointer loop': lambda q: answer(q, struct.pack('!H', 0xc000 | len(q))),
+            'pointer outside packet': lambda q: answer(q, b'\xff\xff'),
+            'oversized name': lambda q: answer(q, (b'\x3f' + b'a' * 63) * 4 + b'\0'),
+            'truncated additional': lambda q: fixtures.dns_reply(q)[:10] + b'\0\1' + fixtures.dns_reply(q)[12:],
+            'unrelated answer': lambda q: answer(q, b'\x05other\0'),
+            'CNAME loop': lambda q: header(q) + q[12:] + b'\xc0\x0c' + struct.pack('!HHIH', 5, 1, 0, 2) + b'\xc0\x0c',
+            'oversized datagram with valid prefix': lambda q: fixtures.dns_reply(q) + b'\0' * 4096,
+            '64 KiB shared pointers': self.oversized_reply,
+        }
+        for label, reply in replies.items():
+            with self.subTest(reply=label), fixtures.udp_dns(reply) as (endpoint, requests), \
+                    patch.object(rt, '_dns_server', return_value=endpoint):
+                rt.write_hosts(rt.core.parse_names('media.example.net'))
+                self.assertIn('100.80.0.1 media.example.net\n', hosts.read_text())
+                self.assertEqual(rt.read_file('hosts'), saved)
+
+    def test_oversized_configured_names_and_invalid_forced_addresses(self):
+        rt = self.rt
+        hosts = fixtures.RuntimeTest.hosts_file(self)
+        for name in ('a' * 64 + '.test', '.'.join(['a' * 63] * 4)):
+            with self.subTest(name=name), self.assertRaises(ValueError):
+                core.parse_names(name)
+            with self.assertRaises(ValueError):
+                core.dns_query(name, 123)
+        with self.assertRaises(ValueError):
+            rt.write_hosts([('media.example.net', '8.8.8.8')])
+        self.assertEqual(hosts.read_text(), '127.0.0.1 localhost\n')
 
 
 class PrivateRuntimeTest(unittest.TestCase):

@@ -140,7 +140,7 @@ class BootHostsTest(unittest.TestCase):
             mappings = [('media.example.net', '100.80.1.2'), ('box', '100.80.1.3')]
             original = '127.0.0.1 localhost\n\n' + '  ' + core.HOSTS_BEGIN + '  \n100.80.0.1 old\n  ' + core.HOSTS_END + '  ' + '\n\n'
             path.write_text(original)
-            config.write_text(''.join('%s %s\n' % (ip, name) for name, ip in mappings))
+            config.write_text('# server https://example.net:443\n' + ''.join('%s %s\n' % (ip, name) for name, ip in mappings))
             command = ['sh', str(ROOT / 'service.harpywing/bin/harpywing-hosts'), str(path), str(config)]
             for _ in range(2):
                 subprocess.run(command, check=True)
@@ -169,9 +169,9 @@ class PackagingSourceTest(unittest.TestCase):
         po = (ROOT / 'service.harpywing/resources/language/resource.language.en_gb/strings.po').read_text()
         translated = set(re.findall(r'msgctxt "#(\d+)"\nmsgid "[^\n]+"\nmsgstr "[^\n]+"', po))
         self.assertTrue(ids <= translated, ids - translated)
-        for directory in ('service.harpywing', 'scripts', 'repository.harpywing'):
-            for path in (ROOT / directory).rglob('*'):
-                if path.suffix in ('.py', '.xml', '.po') or path.name in ('netbird', 'harpywing-daemon', 'harpywing-hosts'):
+        for directory in ('service.harpywing', 'scripts', 'repository.harpywing', 'tests'):
+            for path in [ROOT / 'README.md', *(ROOT / directory).rglob('*')]:
+                if path.suffix in ('.py', '.xml', '.po', '.md') or path.name in ('netbird', 'harpywing-daemon', 'harpywing-hosts'):
                     source = path.read_text()
                     for private in PRIVATE_VALUES:
                         self.assertNotIn(private, source, str(path))

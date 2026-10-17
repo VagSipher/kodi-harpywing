@@ -4,6 +4,7 @@ import ipaddress
 import json
 import posixpath
 import re
+import struct
 from urllib.parse import urlsplit
 
 UNIT_NAME = "service.harpywing.service"
@@ -13,6 +14,7 @@ _INTERFACE = re.compile(r"[A-Za-z0-9_][A-Za-z0-9_.-]{0,14}")  # Linux IFNAMSIZ
 
 # NetBird hands out overlay addresses from the CGNAT range.
 NETBIRD_RANGE = ipaddress.ip_network("100.64.0.0/10")
+DNS_MAX_PACKET = 4096
 _HOSTNAME = re.compile(r"^(?=.{1,253}$)[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)*$")
 
 
@@ -188,15 +190,122 @@ def parse_names(value):
         return result
     for entry in value.split(";"):
         parts = entry.split("=")
-        if len(parts) != 2:
+        if len(parts) not in (1, 2):
             raise ValueError("bad_mapping")
-        name, address = (part.strip().lower() for part in parts)
-        error = validate_mapping(name, address)
+        name = parts[0].strip().lower()
+        address = parts[1].strip() if len(parts) == 2 else None
+        error = validate_mapping(name, address) if address is not None else (
+            "" if _HOSTNAME.fullmatch(name) else "bad_name")
         if error or not name or name in seen:
             raise ValueError(error or "duplicate_name")
         seen.add(name)
         result.append((name, address))
     return result
+
+
+def hosts_mappings(text):
+    """Read aliases too; callers decide which addresses they trust."""
+    result = []
+    for line in text.splitlines():
+        fields = line.split("#", 1)[0].split()
+        if len(fields) >= 2:
+            result.extend((name.lower().rstrip("."), fields[0]) for name in fields[1:])
+    return result
+
+
+def dns_query(name, identifier):
+    if not _HOSTNAME.fullmatch(name):
+        raise ValueError("bad DNS name")
+    question = b"".join(bytes([len(label)]) + label.encode("ascii") for label in name.split("."))
+    return struct.pack("!6H", identifier, 0x0100, 1, 0, 0, 0) + question + b"\0\0\1\0\1"
+
+
+def _dns_name(packet, offset):
+    labels, seen, end = [], set(), None
+    length = jumps = 0
+    while True:
+        if offset in seen or offset >= len(packet):
+            raise ValueError("invalid DNS name pointer")
+        seen.add(offset)
+        size = packet[offset]
+        if size & 0xc0 == 0xc0:
+            jumps += 1
+            if jumps > 16:
+                raise ValueError("too many DNS compression jumps")
+            if offset + 1 >= len(packet):
+                raise ValueError("truncated DNS pointer")
+            if end is None:
+                end = offset + 2
+            offset = ((size & 0x3f) << 8) | packet[offset + 1]
+            continue
+        if size & 0xc0 or offset + 1 + size > len(packet):
+            raise ValueError("invalid DNS label")
+        offset += 1
+        if not size:
+            return ".".join(labels).lower(), end if end is not None else offset
+        length += size + 1
+        if length > 254:
+            raise ValueError("DNS name too long")
+        label = packet[offset:offset + size].decode("ascii")
+        if "." in label:
+            raise ValueError("invalid DNS label")
+        labels.append(label)
+        offset += size
+
+
+def dns_address(packet, name, identifier):
+    """Validate an A reply, following CNAMEs, and choose the first overlay IPv4."""
+    if len(packet) > DNS_MAX_PACKET:
+        raise ValueError("DNS packet too large")
+    try:
+        reply_id, flags, questions, answers, authority, additional = struct.unpack_from("!6H", packet)
+        if answers + authority + additional > 32:
+            raise ValueError("too many DNS records")
+        if reply_id != identifier or flags & 0xfa00 != 0x8000 or questions != 1:
+            raise ValueError("invalid DNS header")  # QR, opcode and TC
+        if flags & 15:
+            raise ValueError("DNS rcode %s" % (flags & 15))
+        question, offset = _dns_name(packet, 12)
+        if question != name or struct.unpack_from("!HH", packet, offset) != (1, 1):
+            raise ValueError("invalid DNS question")
+        offset += 4
+        addresses, aliases = [], {}
+        for index in range(answers + authority + additional):
+            owner, offset = _dns_name(packet, offset)
+            kind, family, ttl, size = struct.unpack_from("!HHIH", packet, offset)
+            offset += 10
+            end = offset + size
+            if end > len(packet):
+                raise ValueError("truncated DNS record")
+            if family == 1:
+                if kind == 1:
+                    if size != 4:
+                        raise ValueError("invalid DNS A record")
+                    addresses.append((owner, str(ipaddress.IPv4Address(packet[offset:end])), index < answers))
+                elif kind == 5:
+                    target, used = _dns_name(packet, offset)
+                    if used != end:
+                        raise ValueError("invalid DNS CNAME record")
+                    if owner in aliases:
+                        raise ValueError("duplicate DNS CNAME owner")
+                    aliases[owner] = target
+            offset = end
+        if aliases.keys() & {owner for owner, address, in_answer in addresses}:
+            raise ValueError("DNS name has both CNAME and A records")
+        reachable = {name}
+        while name in aliases:
+            if len(reachable) > 8:
+                raise ValueError("too many DNS CNAMEs")
+            name = aliases[name]
+            if name in reachable:
+                raise ValueError("DNS CNAME loop")
+            reachable.add(name)
+        for owner, address, in_answer in addresses:
+            if in_answer and owner == name and not validate_mapping(owner, address):
+                return address
+        raise ValueError("no NetBird IPv4 answer")
+    except (struct.error, UnicodeError) as exc:
+        raise ValueError("malformed DNS reply") from exc
 
 
 def binary_name(machine):
@@ -215,6 +324,15 @@ def valid_server(value):
                 and url.path in ("", "/") and (url.port is None or 1 <= url.port <= 65535))
     except ValueError:
         return False
+
+
+def normalize_server(value):
+    """Canonical management origin; an invalid URL cannot identify a server."""
+    if not isinstance(value, str) or not valid_server(value):
+        return ""
+    url = urlsplit(value)
+    host = "[%s]" % url.hostname if ":" in url.hostname else url.hostname
+    return "%s://%s:%s" % (url.scheme.lower(), host.lower(), url.port or 443)
 
 
 def parse_device_login(output):

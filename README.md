@@ -40,9 +40,25 @@ Inbound removes NetBird’s inbound block: every service listening on this box
 (Kodi web interface, SSH, file sharing…) becomes reachable by peers the server
 allows. Keep it off unless needed. NetBird’s built-in server SSH stays disabled. Changing
 these options announces and applies a reconnection (`down`, then `up`
-without a key). NetBird DNS and server routes remain disabled. Optional
-names use `name=NetBirdIPv4;name=NetBirdIPv4`, unique hostnames and addresses
-in `100.64.0.0/10`; names are restored before Kodi at boot and every minute.
+without a key). System DNS management and server routes remain disabled.
+
+**Names to reach** accepts unique names separated by semicolons, mixing
+`media.example.net;box.netbird.selfhosted;fixed.example=100.80.0.1`.
+A name without an address is queried through NetBird's local DNS server
+(on this peer's NetBird IPv4, UDP port 53). Each refresh has a three-second
+budget for all names together, including the NetBird status check.
+Only IPv4 answers in `100.64.0.0/10` are accepted. This resolves NetBird Custom
+Zones and peer names; it does not provide general Internet DNS. An explicit
+`name=NetBirdIPv4` forces that address without a DNS query.
+Names are refreshed every minute. If DNS or the connection fails, each name
+keeps its last known valid address; a name never resolved is omitted. Saved
+addresses are restored before Kodi at boot. Cached DNS addresses are reused
+only for the same management server. NetBird keeps `--disable-dns`:
+the system resolver and `/etc/resolv.conf` are unchanged.
+A name already present outside Harpy Wing's hosts block triggers a journal
+message and a Kodi notification once per name and setting value. Those lines
+keep their order and content; an earlier entry (such as one copied from
+`/storage/.config/hosts.conf` by CoreELEC) may override Harpy Wing's address.
 
 Turning Connect this box off **stops** the daemon and removes startup/names,
 but keeps the identity. A WireGuard interface left by a crashed daemon is

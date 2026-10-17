@@ -170,6 +170,25 @@ class ServiceTest(unittest.TestCase):
         hosts.assert_not_called()
         self.assertTrue(any(call.args[0] == 32055 for call in self.notify.call_args_list))
 
+    def test_periodic_apply_resolves_bare_name_through_udp(self):
+        rt = self.rt
+        write_hosts = rt.write_hosts
+        hosts = fixtures.RuntimeTest.hosts_file(self)
+        service = self.load_service()
+        self.addon.getSetting.side_effect = lambda key: {
+            'management_url': 'https://api.netbird.io', 'hosts': 'media.example.net'
+        }.get(key, '')
+        self.wait.return_value = {'daemon': 'Connected'}
+        rt.remember_options(rt.options())
+        with fixtures.udp_dns() as (endpoint, requests), \
+                patch.object(rt, '_dns_server', return_value=endpoint), \
+                patch.object(rt, 'write_hosts', wraps=write_hosts):
+            service.apply()
+            service.apply()
+            self.assertEqual(len(requests), 2)
+        self.assertIn('100.80.166.134 media.example.net\n', hosts.read_text())
+        self.assertFalse(any(call.args[0] == 32055 for call in self.notify.call_args_list))
+
     def test_connected_without_saved_options_reconciles_and_records_only_success(self):
         service = self.load_service()
         self.wait.return_value = {'daemon': 'Connected'}

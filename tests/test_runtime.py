@@ -1,5 +1,7 @@
 """Exercise identity / update operations with Kodi and system commands stubbed."""
 import importlib
+import json
+from contextlib import contextmanager
 import fcntl
 import os
 from pathlib import Path
@@ -8,6 +10,10 @@ import tempfile
 import types
 import unittest
 import subprocess
+import socket
+import struct
+import threading
+import time
 from unittest.mock import Mock, patch
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -16,12 +22,52 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'service.harpywing/resources/lib'))
 
 
+def dns_reply(query, addresses=('100.80.166.134',), flags=0x8180):
+    records = b''.join(b'\xc0\x0c' + struct.pack('!HHIH', 1, 1, 30, 4)
+                       + socket.inet_aton(ip) for ip in addresses)
+    return query[:2] + struct.pack('!5H', flags, 1, len(addresses), 0, 0) + query[12:] + records
+
+
+@contextmanager
+def udp_dns(reply=dns_reply):
+    """A real local UDP endpoint; no socket-module mocking in DNS tests."""
+    requests, errors = [], []
+    stopped = threading.Event()
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as server:
+        server.bind(('127.0.0.1', 0))
+        server.settimeout(0.1)
+        def serve():
+            while not stopped.is_set():
+                try:
+                    query, source = server.recvfrom(65535)
+                except socket.timeout:
+                    continue
+                try:
+                    requests.append(query)
+                    packet = reply(query)
+                    if packet is not None:
+                        server.sendto(packet, source)
+                except Exception as exc:
+                    errors.append(exc)
+        thread = threading.Thread(target=serve)
+        thread.start()
+        try:
+            yield server.getsockname(), requests
+        finally:
+            stopped.set()
+            thread.join(3)
+            if thread.is_alive():
+                raise AssertionError('DNS test server did not stop')
+            if errors:
+                raise errors[0]
+
+
 class RuntimeTest(unittest.TestCase):
     def setUp(self):
         self.folder = tempfile.TemporaryDirectory(dir=ROOT / 'build')
         self.addCleanup(self.folder.cleanup)
         self.addon = Mock()
-        values = {'path': str(ROOT / 'service.harpywing'), 'profile': self.folder.name, 'version': '0.2.0'}
+        values = {'path': str(ROOT / 'service.harpywing'), 'profile': self.folder.name, 'version': '0.4.0+nb0.80.0'}
         self.addon.getAddonInfo.side_effect = values.get
         self.addon.getSetting.return_value = ''
         self.addon.getSettingBool.return_value = False
@@ -44,6 +90,216 @@ class RuntimeTest(unittest.TestCase):
         Path(self.rt.SYS_NET).mkdir()
         self.rt.BOOT_ID = self.folder.name + '/boot_id'
         Path(self.rt.BOOT_ID).write_text('boot-1\n')
+
+    def hosts_file(self):
+        self.rt.HOSTS = self.folder.name + '/system-hosts'
+        path = Path(self.rt.HOSTS)
+        path.write_text('127.0.0.1 localhost\n')
+        return path
+
+    def cache_text(self, entries):
+        return '# server %s\n' % self.rt.core.normalize_server(self.rt.options()['management_url']) + entries
+
+    def test_udp_names_mixed_with_forced_address_and_no_rewrite(self):
+        rt = self.rt
+        hosts = self.hosts_file()
+        mappings = rt.core.parse_names('media.example.net;fixed=100.64.0.1')
+        with udp_dns() as (endpoint, requests), patch.object(rt, '_dns_server', return_value=endpoint):
+            rt.write_hosts(mappings)
+            self.assertIn('100.80.166.134 media.example.net\n100.64.0.1 fixed\n', hosts.read_text())
+            self.assertEqual(rt.read_file('hosts'), self.cache_text('100.80.166.134 media.example.net\n100.64.0.1 fixed\n'))
+            with patch.object(rt, 'save_file') as save, patch.object(rt.os, 'replace') as replace:
+                rt.write_hosts(mappings)
+            save.assert_not_called()
+            replace.assert_not_called()
+            self.assertEqual(len(requests), 2)
+            self.assertTrue(all(rt.core._dns_name(q, 12)[0] == 'media.example.net' for q in requests))
+        with patch.object(rt, '_dns_server', side_effect=AssertionError('forced address queried DNS')):
+            rt.write_hosts([('fixed', '100.64.0.1')])
+
+    def test_udp_failure_keeps_valid_saved_address_and_logs_state_changes(self):
+        rt = self.rt
+        hosts = self.hosts_file()
+        mappings = rt.core.parse_names('media.example.net;never-resolved')
+        rt.save_file('hosts', self.cache_text('100.80.0.1 media.example.net\n'))
+        for reply in (lambda q: dns_reply(q, ('8.8.8.8',)),
+                      lambda q: dns_reply(q, (), 0x8183)):
+            with self.subTest(reply=reply), udp_dns(reply) as (endpoint, requests), \
+                    patch.object(rt, '_dns_server', return_value=endpoint), patch.object(rt, 'log') as log:
+                rt.write_hosts(mappings)
+                rt.write_hosts(mappings)
+                self.assertEqual(sum('DNS failed' in call.args[0] for call in log.call_args_list), 2)
+                self.assertIn('100.80.0.1 media.example.net\n', hosts.read_text())
+                self.assertNotIn('never-resolved', hosts.read_text())
+                self.assertEqual(rt.read_file('hosts'), self.cache_text('100.80.0.1 media.example.net\n'))
+        with udp_dns() as (endpoint, requests), patch.object(rt, '_dns_server', return_value=endpoint), \
+                patch.object(rt, 'log') as log:
+            rt.write_hosts(mappings)
+            rt.write_hosts(mappings)
+            self.assertEqual(sum('resolved to' in call.args[0] for call in log.call_args_list), 2)
+
+    def test_dns_timeout_and_disconnected_status_keep_previous_address(self):
+        rt = self.rt
+        hosts = self.hosts_file()
+        names = ['media.example.net'] + ['name%d.example.net' % i for i in range(29)]
+        original_server = rt._dns_server
+        def status(timeout):
+            self.assertGreater(timeout, 2.5)
+            self.assertLessEqual(timeout, 3)
+            time.sleep(0.6)  # Included in the same three-second deadline.
+            return '{"daemonStatus":"Connected","netbirdIp":"100.80.0.2/16","management":{"url":"https://example.net:443"}}'
+        self.addon.getSetting.side_effect = lambda key: 'https://example.net' if key == 'management_url' else ''
+        saved = self.cache_text(''.join('100.80.0.1 %s\n' % name for name in names))
+        rt.save_file('hosts', saved)
+        with udp_dns(lambda q: None) as (endpoint, requests):
+            def server(timeout, management_url):
+                self.assertEqual(original_server(timeout, management_url), ('100.80.0.2', 53))
+                return endpoint
+            with patch.object(rt, 'status_json', side_effect=status), patch.object(rt, '_dns_server', side_effect=server):
+                started = time.monotonic()
+                rt.write_hosts([(name, None) for name in names])
+                elapsed = time.monotonic() - started
+            self.assertLessEqual(elapsed, 3.5)
+            self.assertEqual(len(requests), 1)
+            self.assertEqual(rt.read_file('hosts'), saved)
+        self.assertIn('100.80.0.1 media.example.net\n', hosts.read_text())
+        mappings = rt.core.parse_names('media.example.net')
+        for status in ('{"daemonStatus":"NeedsLogin","netbirdIp":"100.80.0.2/16"}',
+                       '{"daemonStatus":"Connected","netbirdIp":""}',
+                       '{"daemonStatus":"Connected","netbirdIp":"192.168.0.1/24"}', 'unavailable', '[]'):
+            with self.subTest(status=status), patch.object(rt, 'status_json', return_value=status):
+                rt.write_hosts(mappings)
+            self.assertIn('100.80.0.1 media.example.net\n', hosts.read_text())
+        with patch.object(rt, 'status_json', return_value='{"daemonStatus":"Connected","netbirdIp":"100.80.0.2/16","management":{"url":"https://EXAMPLE.NET:443"}}'):
+            self.assertEqual(rt._dns_server(), ('100.80.0.2', 53))
+
+    def test_invalid_cache_is_empty_and_off_never_reads_it(self):
+        rt = self.rt
+        hosts = self.hosts_file()
+        cache = Path(rt.PRIVATE, 'hosts')
+        header = self.cache_text('').encode()
+        for content in (b'\xff', b'bad cache\n', b'8.8.8.8 media.example.net\n',
+                        b'100.80.0.1 media.example.net\n100.80.0.2 MEDIA.EXAMPLE.NET\n'):
+            with self.subTest(content=content):
+                cache.write_bytes(header + content)
+                with patch.object(rt, '_dns_server', side_effect=ValueError('offline')), patch.object(rt, 'log') as log:
+                    rt.write_hosts([('media.example.net', None)])
+                self.assertTrue(any('ignoring' in call.args[0] for call in log.call_args_list))
+                self.assertNotIn('media.example.net', hosts.read_text())
+                self.assertEqual(cache.read_bytes(), header)
+                cache.write_bytes(header + content)
+                with patch.object(rt, 'read_file', side_effect=AssertionError('Off read the cache')):
+                    rt.write_hosts([])
+                self.assertEqual(cache.read_bytes(), header)
+                cache.write_bytes(header + content)
+                with patch.object(rt, '_dns_server', side_effect=AssertionError('forced address queried DNS')):
+                    rt.write_hosts([('fixed.example.net', '100.80.0.2')])
+                self.assertEqual(cache.read_text(), self.cache_text('100.80.0.2 fixed.example.net\n'))
+
+    def test_dns_cache_requires_matching_management_server(self):
+        rt = self.rt
+        self.hosts_file()
+        self.addon.getSetting.side_effect = lambda key: 'https://example.net' if key == 'management_url' else ''
+        mappings = [('media.example.net', None), ('fixed.example.net', '100.80.0.2')]
+        entries = '100.80.0.1 media.example.net\n'
+        for header in ('', '# server https://old.example.net:443\n', '# server invalid\n'):
+            rt.save_file('hosts', header + entries)
+            with self.subTest(header=header), patch.object(rt, '_dns_server', side_effect=ValueError('offline')):
+                self.assertEqual(rt.resolve_names(mappings), [mappings[1]])
+        rt.save_file('hosts', self.cache_text(entries))
+        rt.save_file('options.json', '{"management_url":"https://old.example.net"}')
+        with patch.object(rt, '_dns_server', side_effect=ValueError('offline')):
+            self.assertEqual(rt.resolve_names(mappings), [('media.example.net', '100.80.0.1'), mappings[1]])
+            self.addon.getSetting.side_effect = lambda key: 'https://new.example.net' if key == 'management_url' else ''
+            rt.write_hosts(mappings)
+        self.assertEqual(rt.read_file('hosts'), self.cache_text('100.80.0.2 fixed.example.net\n'))
+
+    def test_server_transition_never_relabels_or_reuses_old_dns_address(self):
+        rt = self.rt
+        hosts = self.hosts_file()
+        configured = ['https://a.example.net']
+        daemon = ['https://A.EXAMPLE.NET:443/']
+        self.addon.getSetting.side_effect = lambda key: configured[0] if key == 'management_url' else ''
+        def status(timeout):
+            return json.dumps({'daemonStatus': 'Connected', 'netbirdIp': '100.80.0.2/16',
+                               'management': {'url': daemon[0]}})
+        original_server = rt._dns_server
+        silent = [False]
+        with udp_dns(lambda q: None if silent[0] else dns_reply(q)) as (endpoint, requests):
+            def server(timeout, management_url):
+                original_server(timeout, management_url)
+                return endpoint
+            with patch.object(rt, 'status_json', side_effect=status), patch.object(rt, '_dns_server', side_effect=server):
+                rt.write_hosts([('media.example.net', None)])
+                self.assertEqual(rt.read_file('hosts'), '# server https://a.example.net:443\n100.80.166.134 media.example.net\n')
+                self.assertEqual(len(requests), 1)
+                configured[0] = 'https://b.example.net'
+                with self.assertRaisesRegex(ValueError, 'NetBird is connected to another server'):
+                    original_server()
+                rt.write_hosts([('media.example.net', None)])
+                self.assertEqual(len(requests), 1)
+                self.assertNotIn('media.example.net', hosts.read_text())
+                rt.save_file('options.json', json.dumps(rt.options()))  # Reconnection records B.
+                daemon[0] = configured[0] + ':443'
+                silent[0] = True
+                rt.write_hosts([('media.example.net', None)])
+                self.assertEqual(len(requests), 2)
+                self.assertNotIn('media.example.net', hosts.read_text())
+                self.assertEqual(rt.read_file('hosts'), '# server https://b.example.net:443\n')
+
+    def test_cache_unused_while_daemon_reports_another_server(self):
+        rt = self.rt
+        self.hosts_file()
+        self.addon.getSetting.side_effect = lambda key: 'https://b.example.net' if key == 'management_url' else ''
+        rt.save_file('hosts', '# server https://b.example.net:443\n100.80.0.1 media.example.net\n')
+        status = json.dumps({'daemonStatus': 'Connected', 'netbirdIp': '100.80.0.2/16',
+                             'management': {'url': 'https://a.example.net:443'}})
+        with udp_dns(dns_reply) as (endpoint, requests), patch.object(rt, 'status_json', return_value=status):
+            self.assertEqual(rt.resolve_names([('media.example.net', None)]), [])
+            self.assertEqual(requests, [])
+        with patch.object(rt, '_dns_server', side_effect=ValueError('offline')):
+            self.assertEqual(rt.resolve_names([('media.example.net', None)]), [('media.example.net', '100.80.0.1')])
+
+    def test_server_snapshot_survives_setting_change_during_dns(self):
+        rt = self.rt
+        self.hosts_file()
+        configured = ['https://a.example.net']
+        self.addon.getSetting.side_effect = lambda key: configured[0] if key == 'management_url' else ''
+        def reply(query):
+            configured[0] = 'https://b.example.net'
+            return dns_reply(query)
+        with udp_dns(reply) as (endpoint, requests), patch.object(rt, '_dns_server', return_value=endpoint):
+            rt.write_hosts([('media.example.net', None)])
+        self.assertTrue(rt.read_file('hosts').startswith('# server https://a.example.net:443\n'))
+        self.assertEqual(rt._cached_names(rt.core.normalize_server(configured[0])), {})
+
+    def test_hosts_conflicts_include_aliases_and_warn_once_per_setting_value(self):
+        rt = self.rt
+        hosts = self.hosts_file()
+        original = '127.0.0.1 localhost\n100.80.0.9 other MEDIA.EXAMPLE.NET. # alias\n'
+        hosts.write_text(original)
+        self.addon.getSetting.return_value = 'media.example.net=100.80.0.1'
+        mappings = rt.core.parse_names(self.addon.getSetting.return_value)
+        with patch.object(rt, 'notify') as notify:
+            rt.write_hosts(mappings)
+            rt.write_hosts(mappings)
+            notify.assert_called_once_with(32089, 'media.example.net')
+            self.assertTrue(hosts.read_text().startswith(original))
+            self.addon.getSetting.return_value += ';other=100.80.0.3'
+            rt.write_hosts(mappings)
+            self.assertEqual(notify.call_count, 2)
+            self.assertTrue(hosts.read_text().startswith(original))
+            hosts.write_text(rt.core.apply_hosts('127.0.0.1 localhost\n', mappings=mappings))
+            rt.write_hosts(mappings)
+            self.assertEqual(notify.call_count, 2)
+            hosts.write_text(original)
+            self.addon.getSetting.return_value = 'media.example.net'
+            with patch.object(rt, '_dns_server', side_effect=ValueError('disconnected')):
+                rt.write_hosts(rt.core.parse_names('media.example.net'))
+                rt.write_hosts(rt.core.parse_names('media.example.net'))
+            self.assertEqual(notify.call_count, 3)
+            self.assertTrue(hosts.read_text().startswith(original))
+        self.assertEqual(rt.core.apply_hosts(rt.core.apply_hosts(original, mappings=mappings)), original)
 
     def test_setup_key_file_mode_and_cleanup_even_on_failure(self):
         rt = self.rt
@@ -112,7 +368,7 @@ class RuntimeTest(unittest.TestCase):
             rt.install_unit()
             self.assertIn(['systemctl', 'restart', rt.core.UNIT_NAME], [call.args[0] for call in run.call_args_list])
             self.assertEqual(rt.read_file('previous-version'), '0.1.0')
-            self.assertEqual(rt.read_file('version'), '0.2.0')
+            self.assertEqual(rt.read_file('version'), '0.4.0+nb0.80.0')
             run.reset_mock()
             rt.install_unit()
             self.assertNotIn(['systemctl', 'restart', rt.core.UNIT_NAME], [call.args[0] for call in run.call_args_list])
