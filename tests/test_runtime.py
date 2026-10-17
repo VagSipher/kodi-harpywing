@@ -67,7 +67,7 @@ class RuntimeTest(unittest.TestCase):
         self.folder = tempfile.TemporaryDirectory(dir=ROOT / 'build')
         self.addCleanup(self.folder.cleanup)
         self.addon = Mock()
-        values = {'path': str(ROOT / 'service.harpywing'), 'profile': self.folder.name, 'version': '0.4.0+nb0.80.0'}
+        values = {'path': str(ROOT / 'service.harpywing'), 'profile': self.folder.name, 'version': '0.4.1+nb0.80.0'}
         self.addon.getAddonInfo.side_effect = values.get
         self.addon.getSetting.return_value = ''
         self.addon.getSettingBool.return_value = False
@@ -99,6 +99,40 @@ class RuntimeTest(unittest.TestCase):
 
     def cache_text(self, entries):
         return '# server %s\n' % self.rt.core.normalize_server(self.rt.options()['management_url']) + entries
+
+    def test_guard_restores_block_after_coreelec_rewrite_without_dns(self):
+        rt = self.rt
+        hosts = self.hosts_file()
+        rt.save_file('hosts', self.cache_text('100.80.0.1 media.example.net\n100.80.0.2 fixed.example.net\n'))
+        hosts.write_text('127.0.0.1 localhost\n# copied from hosts.conf\n')  # CoreELEC at Kodi start
+        with patch.object(rt, '_dns_server', side_effect=AssertionError('no DNS in the guard')):
+            self.assertTrue(rt.guard_hosts())
+        text = hosts.read_text()
+        self.assertIn('# copied from hosts.conf\n', text)
+        self.assertIn('100.80.0.1 media.example.net\n100.80.0.2 fixed.example.net\n', text)
+        # Intact block: no write and no lock (the lock logs a line every time).
+        with patch.object(rt, 'Operation', side_effect=AssertionError('no lock when intact')):
+            self.assertFalse(rt.guard_hosts())
+        self.assertEqual(hosts.read_text(), text)
+
+    def test_guard_yields_to_a_running_operation_and_ignores_invalid_cache_lines(self):
+        rt = self.rt
+        hosts = self.hosts_file()
+        rt.save_file('hosts', self.cache_text('8.8.8.8 evil.example.net\nbroken\n100.80.0.1 media.example.net\n'))
+        with rt.Operation('wizard'):
+            self.assertFalse(rt.guard_hosts())
+        self.assertEqual(hosts.read_text(), '127.0.0.1 localhost\n')
+        self.assertTrue(rt.guard_hosts())
+        self.assertNotIn('evil', hosts.read_text())
+        self.assertIn('100.80.0.1 media.example.net', hosts.read_text())
+        # Names turned off (empty cache): a leftover block is removed like at boot.
+        rt.save_file('hosts', self.cache_text(''))
+        self.assertTrue(rt.guard_hosts())
+        self.assertEqual(hosts.read_text(), '127.0.0.1 localhost\n')
+        # No block and no names: another program's formatting is left alone.
+        hosts.write_text('127.0.0.1 localhost\n\n\n')
+        self.assertFalse(rt.guard_hosts())
+        self.assertEqual(hosts.read_text(), '127.0.0.1 localhost\n\n\n')
 
     def test_udp_names_mixed_with_forced_address_and_no_rewrite(self):
         rt = self.rt
@@ -368,7 +402,7 @@ class RuntimeTest(unittest.TestCase):
             rt.install_unit()
             self.assertIn(['systemctl', 'restart', rt.core.UNIT_NAME], [call.args[0] for call in run.call_args_list])
             self.assertEqual(rt.read_file('previous-version'), '0.1.0')
-            self.assertEqual(rt.read_file('version'), '0.4.0+nb0.80.0')
+            self.assertEqual(rt.read_file('version'), '0.4.1+nb0.80.0')
             run.reset_mock()
             rt.install_unit()
             self.assertNotIn(['systemctl', 'restart', rt.core.UNIT_NAME], [call.args[0] for call in run.call_args_list])

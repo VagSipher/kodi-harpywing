@@ -86,6 +86,13 @@ class Service(xbmc.Monitor):
             if self.retry or waited >= 60:
                 waited = 0
                 self.apply()
+            elif not self.busy:
+                try:
+                    # Off must never bring names back, even from a cache left behind.
+                    if rt.settings().getSettingBool("enabled"):
+                        rt.guard_hosts()
+                except Exception as exc:  # the guard must never stop the service
+                    rt.log("hosts guard failed: %s" % core.redact(str(exc)), xbmc.LOGERROR)
 
     def _apply(self, startup):
         chosen = rt.settings()

@@ -50,7 +50,7 @@ budget for all names together, including the NetBird status check.
 Only IPv4 answers in `100.64.0.0/10` are accepted. This resolves NetBird Custom
 Zones and peer names; it does not provide general Internet DNS. An explicit
 `name=NetBirdIPv4` forces that address without a DNS query.
-Names are refreshed every minute. If DNS or the connection fails, each name
+Names are refreshed every minute, and the saved block is checked every five seconds: CoreELEC copies `/storage/.config/hosts.conf` over `/etc/hosts` about 15 seconds after Kodi starts, and the add-on puts its names back without a DNS query. If DNS or the connection fails, each name
 keeps its last known valid address; a name never resolved is omitted. Saved
 addresses are restored before Kodi at boot. Cached DNS addresses are reused
 only for the same management server. NetBird keeps `--disable-dns`:

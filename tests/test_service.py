@@ -320,8 +320,36 @@ class ServiceTest(unittest.TestCase):
                 service.retry = True             # onSettingsChanged refused mid-wait
             return clock[0] >= 75
         service.apply, service.waitForAbort = apply, wait
-        service.run()
+        with patch.object(self.rt, 'guard_hosts') as guard:
+            service.run()
         self.assertEqual(applied, [0, 5, 10, 70])
+        # Every other 5-second tick checks the hosts block (CoreELEC rewrites it).
+        self.assertEqual(guard.call_count, 11)
+
+    def test_hosts_guard_failure_does_not_stop_the_loop(self):
+        service = self.load_service()
+        clock = [0]
+        service.apply = lambda startup=False: None
+        def wait(seconds):
+            clock[0] += seconds
+            return clock[0] >= 20
+        service.waitForAbort = wait
+        with patch.object(self.rt, 'guard_hosts', side_effect=OSError('busy')) as guard:
+            service.run()
+        self.assertEqual(guard.call_count, 3)
+
+    def test_hosts_guard_skipped_while_off(self):
+        service = self.load_service()
+        clock = [0]
+        service.apply = lambda startup=False: None
+        def wait(seconds):
+            clock[0] += seconds
+            return clock[0] >= 20
+        service.waitForAbort = wait
+        self.addon.getSettingBool.side_effect = lambda key: False
+        with patch.object(self.rt, 'guard_hosts') as guard:
+            service.run()
+        guard.assert_not_called()
 
 
 class ActionTest(unittest.TestCase):

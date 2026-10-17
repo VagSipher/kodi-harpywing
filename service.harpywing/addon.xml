@@ -1,5 +1,5 @@
 <?xml version='1.0' encoding='utf-8'?>
-<addon id="service.harpywing" name="Harpy Wing" version="0.4.0+nb0.80.0" provider-name="Harpy Wing contributors">
+<addon id="service.harpywing" name="Harpy Wing" version="0.4.1+nb0.80.0" provider-name="Harpy Wing contributors">
   <requires>
     <import addon="xbmc.python" version="3.0.0" />
   </requires>

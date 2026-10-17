@@ -343,16 +343,58 @@ def write_hosts(mappings=()):
         save_file("hosts", saved)
     wanted = core.apply_hosts(current, mappings=resolved)
     if current != wanted:
-        fd, temp = tempfile.mkstemp(prefix=".harpywing-hosts-", dir=os.path.dirname(path))
-        try:
-            with os.fdopen(fd, "w", encoding="utf-8") as stream:
-                stream.write(wanted)
-                os.fchmod(stream.fileno(), 0o644)
-            os.replace(temp, path)
-        finally:
-            if os.path.exists(temp):
-                os.unlink(temp)
+        _replace_hosts(path, wanted)
         log("hosts updated")
+
+
+def _replace_hosts(path, wanted):
+    fd, temp = tempfile.mkstemp(prefix=".harpywing-hosts-", dir=os.path.dirname(path))
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as stream:
+            stream.write(wanted)
+            os.fchmod(stream.fileno(), 0o644)
+        os.replace(temp, path)
+    finally:
+        if os.path.exists(temp):
+            os.unlink(temp)
+
+
+def _saved_block(path):
+    """/etc/hosts as it should be with the saved names (boot restore rules: the
+    server line and invalid lines are ignored, no DNS)."""
+    mappings, seen = [], set()
+    for line in read_file("hosts").splitlines():
+        fields = line.split()
+        if len(fields) == 2 and not core.validate_mapping(fields[1], fields[0]) and fields[1].lower() not in seen:
+            seen.add(fields[1].lower())
+            mappings.append((fields[1].lower(), fields[0]))
+    with open(path, encoding="utf-8", errors="replace") as stream:
+        current = stream.read()
+    if not mappings and core.HOSTS_BEGIN not in current:
+        return current, current  # nothing of ours: never reformat another file
+    return current, core.apply_hosts(current, mappings=mappings)
+
+
+def guard_hosts():
+    """Put the saved names back when another writer replaced /etc/hosts.
+
+    CoreELEC copies /storage/.config/hosts.conf over it about 15 s after Kodi
+    starts, which dropped the names until the next minute pass. Checked every
+    few seconds; the lock (and its log line) is taken only to repair.
+    """
+    path = os.path.realpath(HOSTS)
+    current, wanted = _saved_block(path)
+    if current == wanted:
+        return False
+    with Operation("hosts-guard") as acquired:
+        if not acquired:
+            return False
+        current, wanted = _saved_block(path)
+        if current == wanted:
+            return False
+        _replace_hosts(path, wanted)
+    log("hosts block restored: /etc/hosts was rewritten by another program")
+    return True
 
 
 def install_unit():
