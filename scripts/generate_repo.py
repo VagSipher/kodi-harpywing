@@ -195,7 +195,7 @@ def write_indexes(output_dir):
         links = ''.join('<li><a href="{0}">{0}</a></li>\n'.format(
             html.escape(p.name + ('/' if p.is_dir() else ''), quote=True)) for p in entries)
         (directory / 'index.html').write_text(
-            '<!doctype html>\n<meta charset="utf-8">\n<title>Harpy Wing</title>\n<ul>\n' + links + '</ul>\n',
+            '<!doctype html>\n<meta charset="utf-8">\n<title>Harpy Branch</title>\n<ul>\n' + links + '</ul>\n',
             encoding='utf-8')
 
 

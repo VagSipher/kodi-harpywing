@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <!-- Adapted from Seranov, Copyright (c) 2025 seranov, MIT; see LICENSE. -->
-<addon id="repository.harpywing" name="Harpy Wing Repository" version="0.2.0" provider-name="Harpy Wing contributors">
-  <extension point="xbmc.addon.repository" name="Harpy Wing Repository">
+<addon id="repository.harpywing" name="Harpy Branch Repository" version="0.2.1" provider-name="Harpy Branch contributors">
+  <extension point="xbmc.addon.repository" name="Harpy Branch Repository">
     <dir>
       <info compressed="false">@BASE_URL@/addons.xml</info>
       <checksum>@BASE_URL@/addons.xml.md5</checksum>
@@ -9,9 +9,12 @@
     </dir>
   </extension>
   <extension point="xbmc.addon.metadata">
-    <summary lang="en_GB">Unofficial NetBird client for Kodi: Harpy Wing repository</summary>
-    <description lang="en_GB">Unofficial NetBird client for Kodi: Harpy Wing repository</description>
+    <summary lang="en_GB">Unofficial NetBird client for Kodi: Harpy Branch repository</summary>
+    <description lang="en_GB">Unofficial NetBird client for Kodi: Harpy Branch repository</description>
     <platform>all</platform>
     <license>MIT</license>
+    <assets>
+      <icon>icon.png</icon>
+    </assets>
   </extension>
 </addon>

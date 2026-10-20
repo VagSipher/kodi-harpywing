@@ -1,6 +1,6 @@
 # Third-party code / pinned revisions
 
-Harpy Wing is GPL-3.0-or-later. Upstream headers are retained; adaptations
+Harpy Branch is GPL-3.0-or-later. Upstream headers are retained; adaptations
 are marked in the files. No GPL-2.0-only code is included.
 
 | Project | Pinned commit | License | Reused files and adaptations |

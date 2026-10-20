@@ -184,7 +184,7 @@ class QRTest(unittest.TestCase):
              patch.object(self.rt, 'netbird', return_value=(0, '')):
             self.assertTrue(self.wizard.wizard())
         # The skin shows about three body lines: the advice alone, status in the heading.
-        dialog.ok.assert_called_once_with('Harpy Wing - Connected', texts[32075])
+        dialog.ok.assert_called_once_with('Harpy Branch - Connected', texts[32075])
 
     def test_success_warns_about_samba_for_both_methods_and_login_parses_raw_status(self):
         for method in (0, 1):
@@ -215,6 +215,6 @@ class QRTest(unittest.TestCase):
                      patch.object(self.rt, 'netbird', return_value=(0, '')):
                     self.assertTrue(self.wizard.wizard())
                 self.assertEqual(dialog.ok.call_count, 2)
-                self.assertEqual(dialog.ok.call_args.args, ('Harpy Wing', self.rt.text(32086)))
+                self.assertEqual(dialog.ok.call_args.args, ('Harpy Branch', self.rt.text(32086)))
                 if method == 1:
                     raw.assert_called_once_with(.5)

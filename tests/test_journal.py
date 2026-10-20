@@ -21,8 +21,8 @@ class JournalDisplayTest(unittest.TestCase):
     def test_empty_sections(self):
         for system, kodi in (('', []), ('new system', []), ('', ['new Kodi'])):
             raw, display = journal_contents(system, kodi)
-            self.assertIn('--- Kodi / Harpy Wing ---', raw)
-            self.assertIn('--- Kodi / Harpy Wing ---', display)
+            self.assertIn('--- Kodi / Harpy Branch ---', raw)
+            self.assertIn('--- Kodi / Harpy Branch ---', display)
 
     def test_ordinary_ascii_brackets_are_preserved(self):
         message = '[service.harpywing] peers=[1, 2] [REDACTED]'

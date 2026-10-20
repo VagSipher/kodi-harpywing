@@ -362,7 +362,7 @@ class ActionTest(unittest.TestCase):
     def test_refusal_is_a_persistent_ok_dialog(self):
         with self.rt.Operation('other holder'), patch.object(self.rt, 'notify') as notify:
             self.run_action('disconnect')
-            self.rt.xbmcgui.Dialog.return_value.ok.assert_called_once_with('Harpy Wing', self.rt.text(32078))
+            self.rt.xbmcgui.Dialog.return_value.ok.assert_called_once_with('Harpy Branch', self.rt.text(32078))
             self.rt.xbmcgui.Dialog.return_value.yesno.assert_not_called()
             notify.assert_not_called()
             with self.rt.Operation('probe') as acquired:

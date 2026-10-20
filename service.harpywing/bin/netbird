@@ -5,6 +5,6 @@ ADDON_BIN=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 case "$(uname -m)" in
   aarch64|arm64) CLIENT=netbird-arm64 ;;
   x86_64) CLIENT=netbird-amd64 ;;
-  *) echo "Harpy Wing: unsupported architecture $(uname -m); armv7 is not supported." >&2; exit 1 ;;
+  *) echo "Harpy Branch: unsupported architecture $(uname -m); armv7 is not supported." >&2; exit 1 ;;
 esac
 exec "$ADDON_BIN/$CLIENT" "$@"

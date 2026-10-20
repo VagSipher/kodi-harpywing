@@ -54,7 +54,7 @@ def log(message, level=xbmc.LOGINFO):
 
 def notify(string_id, *values, error=False):
     message = text(string_id, *values) or "#%s" % string_id
-    xbmcgui.Dialog().notification("Harpy Wing", core.redact(message),
+    xbmcgui.Dialog().notification("Harpy Branch", core.redact(message),
         xbmcgui.NOTIFICATION_ERROR if error else xbmcgui.NOTIFICATION_INFO, 6000)
     log(message, xbmc.LOGERROR if error else xbmc.LOGINFO)
 

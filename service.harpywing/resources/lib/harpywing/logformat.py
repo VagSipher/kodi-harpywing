@@ -76,7 +76,7 @@ def escape_markup(content):
 def journal_contents(system, kodi_newest_first):
     """Display reverse lines like Log Viewer; keep the saved log chronological."""
     kodi = list(kodi_newest_first)
-    separator = "\n\n--- Kodi / Harpy Wing ---\n"
+    separator = "\n\n--- Kodi / Harpy Branch ---\n"
     raw = core.redact(system + separator + "\n".join(reversed(kodi)))
     recent = core.redact("\n".join(reversed(system.splitlines())) + separator + "\n".join(kodi))
     content = process_content_lines(escape_markup(recent).splitlines(), set_style=True)

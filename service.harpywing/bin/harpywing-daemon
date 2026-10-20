@@ -42,7 +42,7 @@ if [ "$migrate" -eq 0 ]; then
     case "$private_real/" in "$data_path/"*) safe_link=0 ;; esac
     [ "$safe_link" -eq 0 ] || unlink "$DATA_DIR"
   fi
-  echo "Harpy Wing: migration skipped unsafe or missing DATA directory: $DATA_DIR" >&2
+  echo "Harpy Branch: migration skipped unsafe or missing DATA directory: $DATA_DIR" >&2
 fi
 # systemd has stopped the previous daemon before starting this wrapper.
 # The wrapper never touches operation.lock: Kodi owns its private lock inode.
@@ -53,7 +53,7 @@ if [ "$migrate" -eq 1 ]; then
     if [ -e "$old" ] || [ -L "$old" ]; then
       if [ -L "$old" ]; then
         unlink "$old"
-        echo "Harpy Wing: migration removed old $name symlink" >&2
+        echo "Harpy Branch: migration removed old $name symlink" >&2
         continue
       fi
       if [ "$name" = state ] && [ -d "$old" ]; then
@@ -61,7 +61,7 @@ if [ "$migrate" -eq 1 ]; then
         find "$old" -type l -exec sh -c '
           for link do
             unlink "$link" || exit 1
-            echo "Harpy Wing: migration removed old state symlink: $link" >&2
+            echo "Harpy Branch: migration removed old state symlink: $link" >&2
           done
         ' sh {} +
       fi
@@ -75,7 +75,7 @@ if [ "$migrate" -eq 1 ]; then
           count=$((count + 1))
           new=$target-$count
         done
-        echo "Harpy Wing: keeping private $name; quarantining old copy in $new" >&2
+        echo "Harpy Branch: keeping private $name; quarantining old copy in $new" >&2
       fi
       mv "$old" "$new"
     fi
@@ -89,7 +89,7 @@ chmod 700 "$STATE_DIR"
 
 # A hosts failure must never keep the tunnel down.
 sh "$ADDON_DIR/bin/harpywing-hosts" "$HOSTS_PATH" "$PRIVATE/hosts" \
-  || echo "Harpy Wing: hosts entries not applied at boot" >&2
+  || echo "Harpy Branch: hosts entries not applied at boot" >&2
 export NB_STATE_DIR="$STATE_DIR"
 export XDG_CONFIG_HOME="$STATE_DIR/user-config"
 "$ADDON_DIR/bin/netbird" service run --log-file console --log-level info &
@@ -108,7 +108,7 @@ remove_leftover_interface() {
   [ "$(cat "$SYS_NET/$name/ifindex" 2>/dev/null)" = "$ifindex" ] || return 0
   grep -qx 'DEVTYPE=wireguard' "$SYS_NET/$name/uevent" 2>/dev/null || return 0
   if ip link delete "$name"; then
-    echo "Harpy Wing: removed interface left by netbird: $name" >&2
+    echo "Harpy Branch: removed interface left by netbird: $name" >&2
   fi
 }
 

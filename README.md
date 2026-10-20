@@ -1,4 +1,7 @@
-# Harpy Wing for Kodi
+# Harpy Branch for Kodi
+
+Formerly named Harpy Wing; the add-on id `service.harpywing` is unchanged, so
+installed copies update in place.
 
 Unofficial NetBird client for **CoreELEC / LibreELEC**, compatible with
 NetBird Cloud and self-hosted servers. One zip contains the official NetBird
@@ -13,8 +16,8 @@ Repository URL: `https://vagsipher.github.io/kodi-harpywing/`
 1. Kodi > Settings > File manager > Add source: enter that repository URL.
 2. Settings > System > Add-ons: enable unknown sources. Add-ons > Install
    from zip file > the source > `repository.harpywing/` >
-   `repository.harpywing-0.2.0.zip`.
-3. Install from repository > Harpy Wing Repository > Services > Harpy Wing.
+   `repository.harpywing-0.2.1.zip`.
+3. Install from repository > Harpy Branch Repository > Services > Harpy Branch.
 4. On first launch without an identity, follow the wizard; you can also open
    Settings > Tools > Connection wizard. Enter the management server URL
    (`https://api.netbird.io` for Cloud, your self-hosted HTTPS management URL),
@@ -31,7 +34,7 @@ Repository URL: `https://vagsipher.github.io/kodi-harpywing/`
    console** so the TV box stays connected.
 6. Tools > Connection status shows Connected, address and direct/relayed
    link. Tools > Journal shows the last 500 systemd lines plus up to 500
-   recent Harpy Wing lines from Kodi, redacts secrets and highlights errors.
+   recent Harpy Branch lines from Kodi, redacts secrets and highlights errors.
    Save journal writes `/storage/harpywing-journal.txt`.
 
 Routes and inbound connections default to off. Permitted peers remain
@@ -55,10 +58,10 @@ keeps its last known valid address; a name never resolved is omitted. Saved
 addresses are restored before Kodi at boot. Cached DNS addresses are reused
 only for the same management server. NetBird keeps `--disable-dns`:
 the system resolver and `/etc/resolv.conf` are unchanged.
-A name already present outside Harpy Wing's hosts block triggers a journal
+A name already present outside Harpy Branch's hosts block triggers a journal
 message and a Kodi notification once per name and setting value. Those lines
 keep their order and content; an earlier entry (such as one copied from
-`/storage/.config/hosts.conf` by CoreELEC) may override Harpy Wing's address.
+`/storage/.config/hosts.conf` by CoreELEC) may override Harpy Branch's address.
 
 Turning Connect this box off **stops** the daemon and removes startup/names,
 but keeps the identity. A WireGuard interface left by a crashed daemon is

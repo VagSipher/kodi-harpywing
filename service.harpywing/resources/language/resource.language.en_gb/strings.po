@@ -164,8 +164,8 @@ msgid "Disconnected; local identity forgotten"
 msgstr "Disconnected; local identity forgotten"
 
 msgctxt "#32081"
-msgid "Harpy Wing journal"
-msgstr "Harpy Wing journal"
+msgid "Harpy Branch journal"
+msgstr "Harpy Branch journal"
 
 msgctxt "#32082"
 msgid "Save journal"
@@ -240,5 +240,5 @@ msgid "Invalid server address: the tunnel is stopped until it is fixed. Enter an
 msgstr "Invalid server address: the tunnel is stopped until it is fixed. Enter an HTTPS URL without credentials, query or path."
 
 msgctxt "#32089"
-msgid "Name %s already exists outside Harpy Wing’s hosts block and may override it. Check /storage/.config/hosts.conf on CoreELEC. Existing entries are kept."
-msgstr "Name %s already exists outside Harpy Wing’s hosts block and may override it. Check /storage/.config/hosts.conf on CoreELEC. Existing entries are kept."
+msgid "Name %s already exists outside Harpy Branch’s hosts block and may override it. Check /storage/.config/hosts.conf on CoreELEC. Existing entries are kept."
+msgstr "Name %s already exists outside Harpy Branch’s hosts block and may override it. Check /storage/.config/hosts.conf on CoreELEC. Existing entries are kept."

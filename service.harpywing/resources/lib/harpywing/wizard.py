@@ -41,7 +41,7 @@ def wizard():
     if not server:
         return False
     if not core.valid_server(server):
-        dialog.ok("Harpy Wing", rt.text(32060))
+        dialog.ok("Harpy Branch", rt.text(32060))
         return False
     method = dialog.select(rt.text(32005), [rt.text(32006), rt.text(32007)],
                            preselect=1 if addon.getSetting("login_method") == "1" else 0)
@@ -55,7 +55,7 @@ def wizard():
                                type=xbmcgui.INPUT_ALPHANUM, option=xbmcgui.ALPHANUM_HIDE_INPUT).strip()
             if key:
                 break
-            if dialog.yesno("Harpy Wing", rt.text(32051), nolabel=rt.text(32071), yeslabel=rt.text(32070)):
+            if dialog.yesno("Harpy Branch", rt.text(32051), nolabel=rt.text(32071), yeslabel=rt.text(32070)):
                 return False
     name = dialog.input(rt.text(32004), addon.getSetting("device_name") or rt.options()["hostname"],
                         type=xbmcgui.INPUT_ALPHANUM)
@@ -73,16 +73,16 @@ def wizard():
     monitor = xbmc.Monitor()
     current = rt.wait_for_daemon(monitor)
     if current["daemon"] == "Unavailable":
-        dialog.ok("Harpy Wing", rt.text(32056, ""))
+        dialog.ok("Harpy Branch", rt.text(32056, ""))
         return False
     code, output = rt.netbird("down")
     if code:
-        dialog.ok("Harpy Wing", rt.text(32052, output))
+        dialog.ok("Harpy Branch", rt.text(32052, output))
         return False
     chosen = rt.options()  # applied by `up` and saved on success: one snapshot
     if method == 0:
         progress = xbmcgui.DialogProgress()
-        progress.create("Harpy Wing", rt.text(32072))
+        progress.create("Harpy Branch", rt.text(32072))
         try:
             success, error = rt.connect(monitor, key, chosen)
         finally:
@@ -121,11 +121,11 @@ def wizard():
         if method == 1:
             # "Connected" goes in the heading: the skin's OK dialog shows about
             # three lines and cut the expiration advice after a blank line.
-            dialog.ok("Harpy Wing - " + rt.text(32050), rt.text(32075))
+            dialog.ok("Harpy Branch - " + rt.text(32050), rt.text(32075))
         else:
-            dialog.ok("Harpy Wing", rt.text(32050))
+            dialog.ok("Harpy Branch", rt.text(32050))
         if rt.samba_open():
-            dialog.ok("Harpy Wing", rt.text(32086))
+            dialog.ok("Harpy Branch", rt.text(32086))
     else:
-        dialog.ok("Harpy Wing", rt.text(32052, core.redact(error) or rt.text(32073)))
+        dialog.ok("Harpy Branch", rt.text(32052, core.redact(error) or rt.text(32073)))
     return success

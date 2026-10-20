@@ -14,9 +14,9 @@ from harpywing import core, runtime as rt
 try:
     with rt.Operation("action:" + (sys.argv[1] if len(sys.argv) > 1 else "wizard")) as acquired:
         if not acquired:
-            xbmcgui.Dialog().ok("Harpy Wing", rt.text(32078))
+            xbmcgui.Dialog().ok("Harpy Branch", rt.text(32078))
         elif len(sys.argv) > 1 and sys.argv[1] == "disconnect":
-            if xbmcgui.Dialog().yesno("Harpy Wing", rt.text(32079)):
+            if xbmcgui.Dialog().yesno("Harpy Branch", rt.text(32079)):
                 # Toast for the text, Kodi's busy spinner for the wait: DialogProgress
                 # showed a frozen "0%" and a Cancel button that could not cancel.
                 rt.notify(32087)
@@ -30,4 +30,4 @@ try:
             from harpywing.wizard import wizard
             wizard()
 except Exception as exc:
-    xbmcgui.Dialog().ok("Harpy Wing", rt.text(32052, core.redact(str(exc))))
+    xbmcgui.Dialog().ok("Harpy Branch", rt.text(32052, core.redact(str(exc))))

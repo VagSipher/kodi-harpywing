@@ -1,4 +1,4 @@
-"""Pure logic of the Harpy Wing Kodi service: no Kodi import, unit tested."""
+"""Pure logic of the Harpy Branch Kodi service: no Kodi import, unit tested."""
 
 import ipaddress
 import json
@@ -26,7 +26,7 @@ def render_unit(addon_dir):
     """
     return (
         "[Unit]\n"
-        "Description=Harpy Wing (NetBird) for Kodi\n"
+        "Description=Harpy Branch (NetBird) for Kodi\n"
         "Wants=network-online.target\n"
         "After=network-online.target\n"
         f"ConditionPathExists={addon_dir}/bin/netbird\n"
