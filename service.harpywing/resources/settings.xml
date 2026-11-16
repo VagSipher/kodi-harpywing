@@ -42,6 +42,9 @@
         <setting id="connection_validated" type="string" label="32020">
           <level>4</level>
           <default />
+          <constraints>
+            <allowempty>true</allowempty>
+          </constraints>
           <visible>false</visible>
           <control type="edit" format="string" />
         </setting>
