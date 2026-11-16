@@ -18,7 +18,7 @@
             </assets>
         </extension>
     </addon>
-    <addon id="service.harpywing" name="Harpy Branch" version="0.4.2+nb0.80.0" provider-name="Harpy Branch contributors">
+    <addon id="service.harpywing" name="Harpy Branch" version="0.4.3+nb0.80.0" provider-name="Harpy Branch contributors">
         <requires>
             <import addon="xbmc.python" version="3.0.0" />
         </requires>
